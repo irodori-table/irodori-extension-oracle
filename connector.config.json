@@ -391,7 +391,7 @@
   },
   "source": {
     "marketplaceId": "irodori.oracle",
-    "repository": "https://github.com/hjosugi/irodori-extension-oracle",
+    "repository": "https://github.com/irodori-table/irodori-extension-oracle",
     "knowledgeEngineStatus": "verified",
     "adapter": "db/oracle.rs",
     "adapterSha256": "fa986acea3255b1bafb25edbe7f0d065c96fe211fc2ee20d5da8e4e832cbea98",
