@@ -290,15 +290,7 @@ impl OracleConfig {
     }
 
     fn redact(&self, message: &str) -> String {
-        self.redaction_values
-            .iter()
-            .fold(message.to_string(), |message, secret| {
-                if secret.is_empty() {
-                    message
-                } else {
-                    message.replace(secret, "****")
-                }
-            })
+        abi::redact(message, &self.redaction_values)
     }
 }
 
@@ -630,7 +622,7 @@ fn value_to_json(value: Option<&OraValue>) -> Value {
         Some(OraValue::Integer(value)) => json!(value),
         Some(OraValue::Float(value)) => json!(value),
         Some(OraValue::String(value)) => Value::String(value.clone()),
-        Some(OraValue::Bytes(value)) => Value::String(format!("\\x{}", hex_encode(value))),
+        Some(OraValue::Bytes(value)) => Value::String(format!("\\x{}", abi::hex_encode(value))),
         Some(OraValue::Json(value)) => value.clone(),
         Some(OraValue::Number(_)) => value
             .and_then(OraValue::as_i64)
@@ -654,10 +646,6 @@ fn row_string(value: Option<&OraValue>) -> Option<String> {
 
 fn row_i64(value: Option<&OraValue>) -> Option<i64> {
     value.and_then(OraValue::as_i64)
-}
-
-fn hex_encode(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 fn push_json_string(object: &mut Map<String, Value>, key: &str, value: String) {
