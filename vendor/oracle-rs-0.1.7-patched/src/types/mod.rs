@@ -16,7 +16,7 @@ mod pickle;
 pub use number::{decode_oracle_number, encode_oracle_number, OracleNumber};
 pub use date::{
     decode_oracle_date, decode_oracle_timestamp, encode_oracle_date, encode_oracle_timestamp,
-    OracleDate, OracleTimestamp,
+    OracleDate, OracleTimestamp, timestamp_has_region,
 };
 pub use binary::{
     decode_binary_double, decode_binary_float, encode_binary_double, encode_binary_float,

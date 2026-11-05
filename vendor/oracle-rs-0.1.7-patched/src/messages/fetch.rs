@@ -49,14 +49,28 @@ impl FetchMessage {
         }
     }
 
-    /// Build the fetch request packet
-    pub fn build_request(&self, _caps: &Capabilities) -> Result<Bytes> {
+    /// Build the fetch request packet.
+    ///
+    /// `sequence_number` continues the connection's TTC sequence, and
+    /// `large_sdu` selects the 4-byte packet length every other request on a
+    /// large-SDU connection uses; a 2-byte one is read as a huge packet.
+    pub fn build_request(
+        &self,
+        caps: &Capabilities,
+        large_sdu: bool,
+        sequence_number: u8,
+    ) -> Result<Bytes> {
         let mut buf = WriteBuffer::new();
 
         // Write message header
         buf.write_u8(MessageType::Function as u8)?;
         buf.write_u8(FunctionCode::Fetch as u8)?;
-        buf.write_u8(0)?; // Sequence number
+        buf.write_u8(sequence_number)?;
+
+        // Token number (required for TTC field version >= 18, i.e. Oracle 23ai)
+        if caps.ttc_field_version >= 18 {
+            buf.write_ub8(0)?;
+        }
 
         // Write fetch body
         buf.write_ub4(self.cursor_id as u32)?;
@@ -70,13 +84,17 @@ impl FetchMessage {
 
         // Build packet with header
         let payload = buf.freeze();
-        let packet_len = PACKET_HEADER_SIZE + payload.len();
+        let packet_len = PACKET_HEADER_SIZE + 2 + payload.len(); // header + data flags + body
 
         let mut packet = BytesMut::with_capacity(packet_len);
 
         // Packet header
-        packet.put_u16(packet_len as u16); // Length
-        packet.put_u16(0); // Checksum
+        if large_sdu {
+            packet.put_u32(packet_len as u32); // Length
+        } else {
+            packet.put_u16(packet_len as u16); // Length
+            packet.put_u16(0); // Checksum
+        }
         packet.put_u8(PacketType::Data as u8);
         packet.put_u8(0); // Flags
         packet.put_u16(0); // Header checksum
@@ -117,11 +135,13 @@ mod tests {
         let msg = FetchMessage::new(1, 100);
         let caps = Capabilities::new();
 
-        let packet = msg.build_request(&caps).unwrap();
+        let packet = msg.build_request(&caps, false, 3).unwrap();
 
         // Check packet header
         assert!(packet.len() > PACKET_HEADER_SIZE);
         assert_eq!(packet[4], PacketType::Data as u8);
+        assert_eq!(u16::from_be_bytes([packet[0], packet[1]]) as usize, packet.len());
+        assert_eq!(packet[12], 3);
 
         // Check data flags are present
         assert_eq!(packet[8], 0);
@@ -132,5 +152,16 @@ mod tests {
 
         // Check function code (byte 11) is Fetch (5)
         assert_eq!(packet[11], FunctionCode::Fetch as u8);
+    }
+
+    #[test]
+    fn test_fetch_message_frames_a_large_sdu_length_in_four_bytes() {
+        let msg = FetchMessage::new(1, 100);
+        let caps = Capabilities::new();
+
+        let packet = msg.build_request(&caps, true, 1).unwrap();
+
+        let length = u32::from_be_bytes([packet[0], packet[1], packet[2], packet[3]]);
+        assert_eq!(length as usize, packet.len());
     }
 }
