@@ -1,6 +1,6 @@
 [package]
 name = "irodori-extension-oracle"
-version = "0.1.7"
+version = "0.1.8"
 publish = false
 edition = "2021"
 license = "0BSD"
@@ -17,6 +17,7 @@ include = [
   "irodori.extension.json",
   "src/**",
   "native/source/**",
+  "vendor/**",
 ]
 
 [lib]
@@ -37,3 +38,7 @@ lto = "thin"
 codegen-units = 1
 strip = "symbols"
 panic = "abort"
+
+[patch.crates-io]
+# oracle-rs 0.1.7 with the fixes listed in vendor/oracle-rs-0.1.7-patched/PATCHES.md.
+oracle-rs = { path = "vendor/oracle-rs-0.1.7-patched" }

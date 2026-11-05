@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "extensionId": "irodori.oracle",
   "visibility": "public",
-  "version": "0.1.4",
+  "version": "0.1.8",
   "connector": {
     "id": "oracle.connector",
     "engine": "oracle",
@@ -45,22 +45,21 @@
         },
         {
           "id": "database",
-          "label": "Database",
+          "label": "Service name / SID",
           "type": "string",
           "profileField": "database"
         }
       ]
     },
     "authMethods": [
-      "none",
-      "connectionString",
       "userPassword",
+      "connectionString",
       "oracleWallet",
+      "customDriverOptions",
       "kerberos",
       "cloudIamToken",
       "accessToken",
-      "oauth2",
-      "customDriverOptions"
+      "oauth2"
     ],
     "tls": "optional",
     "transports": "default",

@@ -377,7 +377,7 @@ dependencies = [
 
 [[package]]
 name = "irodori-extension-oracle"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "irodori-connector-abi",
  "oracle-rs",
@@ -469,8 +469,6 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 [[package]]
 name = "oracle-rs"
 version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c9ca364b441f92b717658c62e85207158b30285deb01811ccd923017f61612e"
 dependencies = [
  "aes",
  "async-trait",

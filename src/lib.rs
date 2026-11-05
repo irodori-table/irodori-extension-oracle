@@ -5,7 +5,9 @@
 
 pub use irodori_connector_abi as abi;
 
+mod connect_string;
 mod driver;
+mod statement_text;
 
 irodori_connector_abi::irodori_export_connector!(
     engine: "oracle",
@@ -73,6 +75,48 @@ mod tests {
             .unwrap()
             .iter()
             .any(|permission| permission == "connectors"));
+    }
+
+    /// The form picks the first method with credentials to collect, so that has
+    /// to be the one every Oracle login needs. Oracle has no anonymous login.
+    #[test]
+    fn the_form_opens_on_user_and_password() {
+        let config: Value = serde_json::from_str(CONFIG_JSON).unwrap();
+        let connection = &config["connection"];
+        let methods = connection["authMethods"].as_array().unwrap();
+
+        assert_eq!(methods[0]["id"], "userPassword");
+        assert!(methods.iter().all(|method| method["id"] != "none"));
+        let field_ids = |method: &Value| -> Vec<String> {
+            method["fields"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|field| field["id"].as_str().unwrap().to_string())
+                .collect()
+        };
+        assert_eq!(field_ids(&methods[0]), ["user", "password"]);
+        assert_eq!(methods[0]["fields"][0]["required"], json!(true));
+        // A wallet secures the connection; the login still needs its credentials.
+        let wallet = methods
+            .iter()
+            .find(|method| method["id"] == "oracleWallet")
+            .unwrap();
+        assert_eq!(
+            field_ids(wallet),
+            ["user", "password", "walletPath", "walletPassword"]
+        );
+
+        // TCPS on or off is what the driver takes, and off comes first.
+        assert_eq!(connection["tls"]["modes"], json!(["disable", "require"]));
+
+        let database = connection["endpoint"]["fields"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|field| field["profileField"] == "database")
+            .unwrap();
+        assert_eq!(database["label"], "Service name / SID");
     }
 
     #[test]

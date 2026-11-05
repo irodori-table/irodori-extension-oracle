@@ -16,7 +16,7 @@ This crate packages the connector metadata, native ABI exports, and driver imple
 - Native ABI: `irodori.connector.native.v1`
 - Driver linked: `yes`
 - Marketplace visibility: `public`
-- Package version: `0.1.7`
+- Package version: `0.1.8`
 
 The package includes a desktop adapter source snapshot from `db/oracle.rs`.
 
@@ -37,7 +37,7 @@ The Rust crate exports the native ABI from `src/lib.rs`, uses `irodori-connector
 | --- | --- | --- | --- |
 | `host` | Host | `string` | yes |
 | `port` | Port | `number` | no |
-| `database` | Database | `string` | no |
+| `database` | Service name / SID | `string` | no |
 
 ## Authentication
 
@@ -45,15 +45,61 @@ The connector advertises these authentication modes so clients can render the ri
 
 | Auth method | Label | Kind | Secret purposes |
 | --- | --- | --- | --- |
-| `none` | No authentication | `none` | none |
-| `connectionString` | Connection string / DSN | `connectionString` | none |
 | `userPassword` | User/password | `userPassword` | `password` |
-| `oracleWallet` | Oracle wallet / mTLS | `certificate` | `privateKey`, `privateKeyPassphrase` |
+| `connectionString` | Connection string / DSN | `connectionString` | none |
+| `oracleWallet` | Oracle wallet / mTLS | `certificate` | `password`, `privateKeyPassphrase` |
+| `customDriverOptions` | Custom driver options | `custom` | `password`, `token`, `privateKey`, `privateKeyPassphrase` |
 | `kerberos` | Kerberos / GSSAPI | `kerberos` | `token` |
 | `cloudIamToken` | Cloud IAM token | `token` | `token` |
 | `accessToken` | Access token | `token` | `token` |
 | `oauth2` | OAuth 2.0 | `oauth2` | `token` |
-| `customDriverOptions` | Custom driver options | `custom` | `password`, `token`, `privateKey`, `privateKeyPassphrase` |
+
+`kerberos`, `cloudIamToken`, `accessToken`, and `oauth2` are declared but not
+implemented yet ([#6](https://github.com/irodori-table/irodori-extension-oracle/issues/6)).
+
+## Connecting
+
+Enter the service name in **Service name / SID**, or `sid:ORCL` for a database
+known by its SID. Left empty, it is `FREEPDB1`.
+
+A connection string can be any of these. Credentials in it apply unless the
+profile sets its own.
+
+```text
+oracle://user:password@host:1521/service   (percent-encode special characters)
+oracle://user:password@host:1521/sid:ORCL
+jdbc:oracle:thin:user/password@//host:1521/service
+jdbc:oracle:thin:@host:1521:ORCL
+user/password@host:1521/service
+//host:1521/service
+```
+
+Add `?wallet=/path/to/wallet&wallet_password=...` to any of them for a wallet.
+
+## Transactions
+
+Each statement commits as it succeeds, as on the app's other engines. To manage a
+transaction by hand, start with `SET TRANSACTION` or `SAVEPOINT`: statements then
+wait for your `COMMIT` or `ROLLBACK`. Closing the connection before that rolls back.
+
+## Testing against a server
+
+`tests/live_oracle.rs` drives the connector through its ABI and is skipped unless
+`IRODORI_ORACLE` is set:
+
+```sh
+docker run -d -p 55521:1521 -e ORACLE_PASSWORD=irodori \
+  -e APP_USER=irodori -e APP_USER_PASSWORD=irodori gvenzl/oracle-free:slim-faststart
+IRODORI_ORACLE=1 cargo test --test live_oracle -- --test-threads=1
+```
+
+`IRODORI_ORACLE_HOST`, `_PORT`, `_USER`, `_PASSWORD`, and `_SERVICE` point it
+elsewhere.
+
+## Patched driver
+
+`vendor/oracle-rs-0.1.7-patched` is oracle-rs 0.1.7 with the fixes listed in its
+[PATCHES.md](vendor/oracle-rs-0.1.7-patched/PATCHES.md).
 
 ## Native ABI Calls
 

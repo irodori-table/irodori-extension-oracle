@@ -16,7 +16,7 @@ Oracle 用のネイティブ Irodori テーブルコネクタ拡張です。
 - ネイティブ ABI: `irodori.connector.native.v1`
 - ドライバー連携: `yes`
 - マーケットプレイス公開範囲: `public`
-- パッケージバージョン: `0.1.3`
+- パッケージバージョン: `0.1.8`
 
 パッケージには `db/oracle.rs` からのデスクトップアダプターのソーススナップショットが含まれています。
 
@@ -37,7 +37,7 @@ Rust クレートは `src/lib.rs` からネイティブ ABI をエクスポー�
 | --- | --- | --- | --- |
 | `host` | ホスト | `string` | yes |
 | `port` | ポート | `number` | no |
-| `database` | データベース | `string` | no |
+| `database` | サービス名 / SID | `string` | no |
 
 ## 認証
 
@@ -46,15 +46,60 @@ Rust クレートは `src/lib.rs` からネイティブ ABI をエクスポー�
 
 | 認証方式 | ラベル | 種類 | 秘密情報の用途 |
 | --- | --- | --- | --- |
-| `none` | 認証なし | `none` | なし |
-| `connectionString` | 接続文字列 / DSN | `connectionString` | なし |
 | `userPassword` | ユーザー/パスワード | `userPassword` | `password` |
-| `oracleWallet` | Oracle ウォレット / mTLS | `certificate` | `privateKey`, `privateKeyPassphrase` |
+| `connectionString` | 接続文字列 / DSN | `connectionString` | なし |
+| `oracleWallet` | Oracle ウォレット / mTLS | `certificate` | `password`, `privateKeyPassphrase` |
+| `customDriverOptions` | カスタムドライバーオプション | `custom` | `password`, `token`, `privateKey`, `privateKeyPassphrase` |
 | `kerberos` | Kerberos / GSSAPI | `kerberos` | `token` |
 | `cloudIamToken` | クラウド IAM トークン | `token` | `token` |
 | `accessToken` | アクセストークン | `token` | `token` |
 | `oauth2` | OAuth 2.0 | `oauth2` | `token` |
-| `customDriverOptions` | カスタムドライバーオプション | `custom` | `password`, `token`, `privateKey`, `privateKeyPassphrase` |
+
+`kerberos`、`cloudIamToken`、`accessToken`、`oauth2` は宣言のみで未実装です
+([#6](https://github.com/irodori-table/irodori-extension-oracle/issues/6))。
+
+## 接続
+
+**サービス名 / SID** にサービス名を入力します。SID で接続するデータベースは
+`sid:ORCL` と入力します。空欄の場合は `FREEPDB1` です。
+
+接続文字列は次のいずれの形式でも指定できます。文字列内の資格情報は、プロファイルに
+別の値がなければ使われます。
+
+```text
+oracle://user:password@host:1521/service   (特殊文字はパーセントエンコード)
+oracle://user:password@host:1521/sid:ORCL
+jdbc:oracle:thin:user/password@//host:1521/service
+jdbc:oracle:thin:@host:1521:ORCL
+user/password@host:1521/service
+//host:1521/service
+```
+
+ウォレットを使うときは `?wallet=/path/to/wallet&wallet_password=...` を付けます。
+
+## トランザクション
+
+アプリの他のエンジンと同じく、各文は成功した時点でコミットされます。手動で管理する
+ときは `SET TRANSACTION` または `SAVEPOINT` から始めてください。以降の文は `COMMIT`
+または `ROLLBACK` まで確定しません。その前に接続を閉じるとロールバックされます。
+
+## サーバーを使ったテスト
+
+`tests/live_oracle.rs` は ABI 経由でコネクタを動かします。`IRODORI_ORACLE` が
+未設定のときはスキップされます。
+
+```sh
+docker run -d -p 55521:1521 -e ORACLE_PASSWORD=irodori \
+  -e APP_USER=irodori -e APP_USER_PASSWORD=irodori gvenzl/oracle-free:slim-faststart
+IRODORI_ORACLE=1 cargo test --test live_oracle -- --test-threads=1
+```
+
+接続先は `IRODORI_ORACLE_HOST`、`_PORT`、`_USER`、`_PASSWORD`、`_SERVICE` で変更できます。
+
+## パッチ済みドライバ
+
+`vendor/oracle-rs-0.1.7-patched` は oracle-rs 0.1.7 に
+[PATCHES.md](vendor/oracle-rs-0.1.7-patched/PATCHES.md) の修正を加えたものです。
 
 ## ネイティブ ABI 呼び出し
 
