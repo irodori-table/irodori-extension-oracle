@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "id": "irodori.oracle",
   "name": "Oracle Connector",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "irodori",
   "description": "Oracle Connector contributes the Oracle database connector through the native connector ABI.",
   "license": "MIT OR 0BSD",
@@ -80,7 +80,7 @@
               },
               {
                 "id": "database",
-                "label": "Database",
+                "label": "Service name / SID",
                 "type": "string",
                 "profileField": "database"
               }
@@ -122,7 +122,7 @@
             },
             {
               "id": "database",
-              "label": "Database",
+              "label": "Service name / SID",
               "type": "string",
               "profileField": "database"
             },
@@ -142,11 +142,28 @@
           ],
           "authMethods": [
             {
-              "id": "none",
-              "label": "No authentication",
-              "kind": "none",
-              "secretPurposes": [],
-              "fields": []
+              "id": "userPassword",
+              "label": "User/password",
+              "kind": "userPassword",
+              "secretPurposes": [
+                "password"
+              ],
+              "fields": [
+                {
+                  "id": "user",
+                  "label": "User",
+                  "type": "string",
+                  "profileField": "user",
+                  "required": true
+                },
+                {
+                  "id": "password",
+                  "label": "Password",
+                  "type": "secret",
+                  "secretPurpose": "password",
+                  "profileField": "password"
+                }
+              ]
             },
             {
               "id": "connectionString",
@@ -164,18 +181,20 @@
               ]
             },
             {
-              "id": "userPassword",
-              "label": "User/password",
-              "kind": "userPassword",
+              "id": "oracleWallet",
+              "label": "Oracle wallet / mTLS",
+              "kind": "certificate",
               "secretPurposes": [
-                "password"
+                "password",
+                "privateKeyPassphrase"
               ],
               "fields": [
                 {
                   "id": "user",
                   "label": "User",
                   "type": "string",
-                  "profileField": "user"
+                  "profileField": "user",
+                  "required": true
                 },
                 {
                   "id": "password",
@@ -183,34 +202,37 @@
                   "type": "secret",
                   "secretPurpose": "password",
                   "profileField": "password"
+                },
+                {
+                  "id": "walletPath",
+                  "label": "Wallet directory",
+                  "type": "path",
+                  "required": true
+                },
+                {
+                  "id": "walletPassword",
+                  "label": "Wallet password",
+                  "type": "secret",
+                  "secretPurpose": "privateKeyPassphrase"
                 }
               ]
             },
             {
-              "id": "oracleWallet",
-              "label": "Oracle wallet / mTLS",
-              "kind": "certificate",
+              "id": "customDriverOptions",
+              "label": "Custom driver options",
+              "kind": "custom",
               "secretPurposes": [
+                "password",
+                "token",
                 "privateKey",
                 "privateKeyPassphrase"
               ],
               "fields": [
                 {
-                  "id": "clientCertificate",
-                  "label": "Client certificate",
-                  "type": "pem"
-                },
-                {
-                  "id": "clientPrivateKey",
-                  "label": "Client private key",
-                  "type": "pem",
-                  "secretPurpose": "privateKey"
-                },
-                {
-                  "id": "clientPrivateKeyPassphrase",
-                  "label": "Private key passphrase",
-                  "type": "secret",
-                  "secretPurpose": "privateKeyPassphrase"
+                  "id": "options",
+                  "label": "Driver options",
+                  "type": "map",
+                  "profileField": "options"
                 }
               ]
             },
@@ -299,25 +321,6 @@
                   "secretPurpose": "token"
                 }
               ]
-            },
-            {
-              "id": "customDriverOptions",
-              "label": "Custom driver options",
-              "kind": "custom",
-              "secretPurposes": [
-                "password",
-                "token",
-                "privateKey",
-                "privateKeyPassphrase"
-              ],
-              "fields": [
-                {
-                  "id": "options",
-                  "label": "Driver options",
-                  "type": "map",
-                  "profileField": "options"
-                }
-              ]
             }
           ],
           "secretPurposes": [
@@ -331,11 +334,7 @@
             "requiredByDefault": false,
             "modes": [
               "disable",
-              "prefer",
-              "require",
-              "verifyCa",
-              "verifyFull",
-              "clientCertificate"
+              "require"
             ],
             "fields": [
               {
@@ -353,6 +352,12 @@
                 "label": "Client private key",
                 "type": "pem",
                 "secretPurpose": "privateKey"
+              },
+              {
+                "id": "clientPrivateKeyPassphrase",
+                "label": "Private key passphrase",
+                "type": "secret",
+                "secretPurpose": "privateKeyPassphrase"
               }
             ]
           },
