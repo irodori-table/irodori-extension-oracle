@@ -237,6 +237,60 @@ pub fn decode_oracle_date(data: &[u8]) -> Result<OracleDate> {
     })
 }
 
+/// Whether an encoded TIMESTAMP WITH TIME ZONE names a region, not an offset.
+pub fn timestamp_has_region(data: &[u8]) -> bool {
+    data.len() >= 13 && data[11] & HAS_REGION_ID != 0
+}
+
+impl OracleTimestamp {
+    /// The same instant as wall-clock time at its own offset. Oracle stores a
+    /// TIMESTAMP WITH TIME ZONE as UTC plus the offset, so `+09:00` beside the
+    /// raw fields would name a time nine hours from the real one.
+    pub fn at_its_offset(&self) -> Self {
+        let offset_minutes = i64::from(self.tz_hour_offset) * 60 + i64::from(self.tz_minute_offset);
+        let minutes = days_from_civil(self.year, self.month, self.day) * 24 * 60
+            + i64::from(self.hour) * 60
+            + i64::from(self.minute)
+            + offset_minutes;
+        let (year, month, day) = civil_from_days(minutes.div_euclid(24 * 60));
+        let minute_of_day = minutes.rem_euclid(24 * 60);
+        Self {
+            year,
+            month,
+            day,
+            hour: (minute_of_day / 60) as u8,
+            minute: (minute_of_day % 60) as u8,
+            ..*self
+        }
+    }
+}
+
+/// Days since 1970-01-01 in the proleptic Gregorian calendar.
+fn days_from_civil(year: i32, month: u8, day: u8) -> i64 {
+    let year = i64::from(year) - i64::from(month <= 2);
+    let era = year.div_euclid(400);
+    let year_of_era = year.rem_euclid(400);
+    let month = i64::from(month);
+    let day_of_year = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + i64::from(day) - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era - 719_468
+}
+
+/// The inverse of [`days_from_civil`].
+fn civil_from_days(days: i64) -> (i32, u8, u8) {
+    let days = days + 719_468;
+    let era = days.div_euclid(146_097);
+    let day_of_era = days.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let shifted_month = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * shifted_month + 2) / 5 + 1;
+    let month = if shifted_month < 10 { shifted_month + 3 } else { shifted_month - 9 };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    (year as i32, month as u8, day as u8)
+}
+
 /// Decode an Oracle TIMESTAMP from wire format bytes
 ///
 /// Handles DATE (7 bytes), TIMESTAMP (11 bytes), and TIMESTAMP WITH TIME ZONE (13 bytes)
@@ -383,6 +437,33 @@ mod tests {
         let ts = decode_oracle_timestamp(&data).unwrap();
         assert_eq!(ts.year, 2024);
         assert_eq!(ts.microsecond, 123456);
+    }
+
+    #[test]
+    fn test_at_its_offset_moves_across_day_month_and_year() {
+        let utc = |year, month, day, hour, minute, tz_hour, tz_minute| OracleTimestamp {
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second: 3,
+            microsecond: 250_000,
+            tz_hour_offset: tz_hour,
+            tz_minute_offset: tz_minute,
+        };
+        let local = utc(2026, 11, 4, 16, 2, 9, 0).at_its_offset();
+        assert_eq!((local.year, local.month, local.day, local.hour, local.minute), (2026, 11, 5, 1, 2));
+        assert_eq!((local.second, local.microsecond, local.tz_hour_offset), (3, 250_000, 9));
+
+        let local = utc(2026, 1, 1, 0, 30, -5, -30).at_its_offset();
+        assert_eq!((local.year, local.month, local.day, local.hour, local.minute), (2025, 12, 31, 19, 0));
+
+        let local = utc(2024, 2, 28, 23, 0, 2, 0).at_its_offset();
+        assert_eq!((local.year, local.month, local.day, local.hour), (2024, 2, 29, 1));
+
+        let local = utc(2026, 12, 31, 23, 45, 0, 30).at_its_offset();
+        assert_eq!((local.year, local.month, local.day, local.hour, local.minute), (2027, 1, 1, 0, 15));
     }
 
     #[test]

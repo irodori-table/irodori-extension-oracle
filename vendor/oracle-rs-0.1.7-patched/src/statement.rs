@@ -554,8 +554,14 @@ impl Statement {
         let sql_upper = self.sql.to_uppercase();
         let trimmed = sql_upper.trim_start();
 
-        // Determine statement type from first keyword
-        if let Some(first_word) = trimmed.split_whitespace().next() {
+        // Determine statement type from first keyword: `select*from t` and
+        // `(select 1 from dual)` are queries too.
+        let keyword = trimmed.trim_start_matches(|c: char| c == '(' || c.is_whitespace());
+        let keyword = keyword
+            .split(|c: char| !c.is_ascii_alphabetic())
+            .next()
+            .filter(|word| !word.is_empty());
+        if let Some(first_word) = keyword {
             self.statement_type = match first_word {
                 "SELECT" | "WITH" => StatementType::Query,
                 "INSERT" | "UPDATE" | "DELETE" | "MERGE" => StatementType::Dml,
